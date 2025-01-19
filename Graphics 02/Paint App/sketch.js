@@ -1,7 +1,7 @@
 let c; 
 
 function setup() {
-  createCanvas(windowWidth, windowHeight);
+  createCanvas(windowWidth,windowHeight);
   c = color('black'); 
   background(240, 240, 240);
 
