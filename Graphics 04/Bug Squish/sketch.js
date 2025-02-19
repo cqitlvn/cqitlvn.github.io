@@ -4,6 +4,7 @@ let gameTime = 30; // 30 seconds countdown
 let gameRunning = true;
 let lastTimeCheck = 0;
 let bugSpeed = 1;
+let restartButton;
 
 // Image variables
 let bugImage1;
@@ -11,21 +12,29 @@ let bugImage2;
 let squishImage;
 
 function preload() {
-  bugImage1 = loadImage('Bug1.png');
-  bugImage2 = loadImage('Bug2.png');
-  squishImage = loadImage('Squish.png');
+  // Load images from the "media" folder
+  bugImage1 = loadImage('media/Bug1.png');
+  bugImage2 = loadImage('media/Bug2.png');
+  squishImage = loadImage('media/Squish.png');
 }
 
 function setup() {
   createCanvas(800, 600);
   imageMode(CENTER);
   
-  // Create initial bugs
+  // Create initial bugs - reduced to a more manageable number
   for (let i = 0; i < 8; i++) {
     bugs.push(new Bug());
   }
   
   lastTimeCheck = millis();
+  
+  // Create restart button (initially hidden)
+  restartButton = createButton('Restart Game');
+  restartButton.position(width/2 - 50, height/2 + 80);
+  restartButton.size(100, 40);
+  restartButton.mousePressed(restartGame);
+  restartButton.hide();
 }
 
 function draw() {
@@ -43,16 +52,22 @@ function draw() {
     if (gameTime <= 0) {
       gameRunning = false;
       gameTime = 0;
+      restartButton.show(); // Show restart button when game ends
+      bugs = []; // Clear all bugs when game ends
     }
     
     // Update and display all bugs
     for (let i = bugs.length - 1; i >= 0; i--) {
-      bugs[i].update();
-      bugs[i].display();
+      let shouldRemove = bugs[i].update();
+      if (shouldRemove) {
+        bugs.splice(i, 1);
+      } else {
+        bugs[i].display();
+      }
     }
     
-    // Add more bugs if needed
-    if (bugs.length < 5) {
+    // Add more bugs if needed - maintain fewer bugs on screen
+    if (bugs.length < 6) {
       bugs.push(new Bug());
     }
   } else {
@@ -62,6 +77,8 @@ function draw() {
     textAlign(CENTER);
     text("GAME OVER", width/2, height/2);
     text("Bugs Squished: " + squishCount, width/2, height/2 + 50);
+    
+    // No bugs are displayed after game over as the bugs array is cleared
   }
   
   // Display the score and timer
@@ -70,6 +87,25 @@ function draw() {
   textAlign(LEFT);
   text("Bugs Squished: " + squishCount, 20, 30);
   text("Time Left: " + gameTime, 20, 60);
+}
+
+// Restart game function
+function restartGame() {
+  // Reset game variables
+  bugs = [];
+  squishCount = 0;
+  gameTime = 30;
+  gameRunning = true;
+  bugSpeed = 1;
+  lastTimeCheck = millis();
+  
+  // Create new bugs - reduced number
+  for (let i = 0; i < 8; i++) {
+    bugs.push(new Bug());
+  }
+  
+  // Hide restart button
+  restartButton.hide();
 }
 
 // Bug class
@@ -91,23 +127,36 @@ class Bug {
     // Status
     this.squished = false;
     this.squishTime = 0;
-    this.size = 40; // Size of hit area
+    this.size = 100; // **Increased bug size**
+    this.shouldRemove = false; // Flag to indicate if this bug should be removed
+
+    // New: Add a small delay before changing direction again
+    this.directionChangeCooldown = millis();
   }
   
   update() {
-    if (!this.squished) {
+    if (this.squished) {
+      // Once squished, the bug stays in place and is removed after 1 second
+      if (millis() - this.squishTime > 1000) {
+        return true; // Remove this bug
+      }
+      return false; // Keep this squished bug
+    } else {
       // Move in current direction
       this.x += cos(this.angle) * this.speed;
       this.y += sin(this.angle) * this.speed;
-      
+
       // Change direction if near edge
-      if (this.x < 20 || this.x > width - 20 || this.y < 20 || this.y > height - 20) {
+      if (this.x < 40 || this.x > width - 40 || this.y < 40 || this.y > height - 40) {
         this.angle = random(TWO_PI);
       }
-      
-      // Random direction change occasionally
-      if (random(100) < 1) {
-        this.angle = random(TWO_PI);
+
+      // **Fix: Prevent sporadic spinning by limiting direction changes**
+      if (millis() - this.directionChangeCooldown > 1000) { // Change direction every second at most
+        if (random(100) < 5) { // Lower chance of direction change
+          this.angle = random(TWO_PI);
+        }
+        this.directionChangeCooldown = millis();
       }
       
       // Animation timing
@@ -115,11 +164,6 @@ class Bug {
       if (this.frameCounter >= this.animationSpeed) {
         this.animationFrame = (this.animationFrame + 1) % 2;
         this.frameCounter = 0;
-      }
-    } else {
-      // Check if squished bug should be removed
-      if (millis() - this.squishTime > 1000) {
-        return true; // Remove this bug
       }
     }
     return false; // Keep this bug
@@ -129,23 +173,18 @@ class Bug {
     push();
     translate(this.x, this.y);
     
+    // Rotate based on the bug's angle
+    rotate(this.angle + HALF_PI);
+    
     if (!this.squished) {
-      // Rotate based on movement direction
-      rotate(this.angle);
-      
-      // Flip image if moving left
-      if (cos(this.angle) < 0) {
-        scale(1, -1);
-      }
-      
-      // Draw the appropriate animation frame
+      // Draw the appropriate animation frame for live bug
       if (this.animationFrame === 0) {
         image(bugImage1, 0, 0, this.size, this.size);
       } else {
         image(bugImage2, 0, 0, this.size, this.size);
       }
     } else {
-      // Draw squished bug
+      // Draw squished bug in the same direction it was facing
       image(squishImage, 0, 0, this.size, this.size);
     }
     
@@ -155,7 +194,7 @@ class Bug {
   checkSquish(mouseX, mouseY) {
     if (!this.squished) {
       let d = dist(mouseX, mouseY, this.x, this.y);
-      if (d < this.size/2) {
+      if (d < this.size / 2) {
         this.squished = true;
         this.squishTime = millis();
         return true;
@@ -176,23 +215,17 @@ function mousePressed() {
       squishCount++;
       squishHappened = true;
       
-      // Remove the squished bug after a delay (handled in update method)
-      setTimeout(() => {
-        bugs.splice(i, 1);
-      }, 1000);
+      // Increase bug speed more significantly after each squish
+      bugSpeed += 0.25; 
       
-      // Increase bug speed after each squish
-      bugSpeed += 0.2;
-      
-      // Create a new bug to replace squished one
-      setTimeout(() => {
-        bugs.push(new Bug());
-      }, 2000);
+      // Add a new bug after a delay (but only one instead of two)
+      if (gameRunning) {
+        setTimeout(() => {
+          if (gameRunning) { // Only add if game is still running
+            bugs.push(new Bug());
+          }
+        }, 2000);
+      }
     }
-  }
-  
-  // If player missed all bugs
-  if (!squishHappened) {
-    // Optional: penalize misses or add feedback
   }
 }
