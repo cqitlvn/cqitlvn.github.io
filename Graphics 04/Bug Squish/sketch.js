@@ -13,9 +13,9 @@ let squishImage;
 
 function preload() {
   // Load images from the "media" folder
-  bugImage1 = loadImage('media/Bug1.png');
-  bugImage2 = loadImage('media/Bug2.png');
-  squishImage = loadImage('media/Squish.png');
+  bugImage1 = loadImage('Bug1.png');
+  bugImage2 = loadImage('Bug2.png');
+  squishImage = loadImage('Squish.png');
 }
 
 function setup() {
