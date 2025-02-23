@@ -6,7 +6,7 @@ let soundNames = ["Meow", "Woof", "Moo", "Squeak", "Caw", "Baaaa"];
 
 function preload() {
     soundNames.forEach(name => {
-        sounds[name] = loadSound(`Media/${name}.mp3`);
+        sounds[name] = loadSound(`media/${name}.mp3`);
     });
 }
 
