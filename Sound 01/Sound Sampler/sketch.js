@@ -50,7 +50,11 @@ function playSound(name) {
         sounds[name].stop();
     }
     sounds[name].play();
-    reverb.process(sounds[name], reverbSlider.value(), 2);
+    
+    // Apply reverb only if the slider value is greater than 0
+    if (reverbSlider.value() > 0) {
+        reverb.process(sounds[name], reverbSlider.value(), 2);
+    }
 }
 
 function draw() {
