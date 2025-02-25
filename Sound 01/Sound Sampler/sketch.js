@@ -3,6 +3,7 @@ let buttons = [];
 let reverb;
 let reverbSlider;
 let soundNames = ["Meow", "Woof", "Moo", "Squeak", "Caw", "Baaaa"];
+let currentReverbValue = 0;
 
 function preload() {
     soundNames.forEach(name => {
@@ -30,9 +31,11 @@ function setup() {
     });
     
     reverb = new p5.Reverb();
+    
     reverbSlider = createSlider(0, 5, 0, 0.1);
     reverbSlider.position(200, height/2);
     reverbSlider.style("width", "200px");
+    reverbSlider.input(updateReverb); // Only update when slider changes
     
     let label = createP("Control the reverb!");
     label.position(210, height/2 - 35);
@@ -43,18 +46,32 @@ function setup() {
     title.position(width/2 - 90, 1);
     title.style("font-size", "24px");
     title.style("font-weight", "bold");
+    
+    // Initialize reverb
+    updateReverb();
+}
+
+function updateReverb() {
+    currentReverbValue = reverbSlider.value();
+    // Set the reverb properties globally
+    reverb.set(currentReverbValue, 2);
 }
 
 function playSound(name) {
     if (sounds[name].isPlaying()) {
         sounds[name].stop();
     }
-    sounds[name].play();
     
-    // Apply reverb only if the slider value is greater than 0
-    if (reverbSlider.value() > 0) {
-        reverb.process(sounds[name], reverbSlider.value(), 2);
+    // Connect to reverb if needed
+    if (currentReverbValue > 0) {
+        sounds[name].disconnect();
+        sounds[name].connect(reverb);
+    } else {
+        sounds[name].disconnect();
+        sounds[name].connect();
     }
+    
+    sounds[name].play();
 }
 
 function draw() {
@@ -62,4 +79,6 @@ function draw() {
     fill(50);
     textSize(18);
     text("^ Click a button to play a sound", width / 2 - 28, height - 20);
+    
+    // No need to dynamically update reverb on every frame
 }
