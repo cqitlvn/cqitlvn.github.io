@@ -11,52 +11,75 @@ let bugImage1;
 let bugImage2;
 let squishImage;
 
+// Audio variables
+let audioContext;
+let isMusicPlaying = false;
+let activeOscillators = [];
+let musicSpeedFactor = 1;
+let musicTimeout;
+let melodyNotes = [220, 330, 440, 550, 660, 880]; // Sample notes
+
+// Sound effect variables
+let gunSound;
+let wrongSound;
+let clockSound;
+let clockPlayed = false; // Prevent multiple plays of clock sound
+
 function preload() {
   // Load images from the "media" folder
   bugImage1 = loadImage('Bug1.png');
   bugImage2 = loadImage('Bug2.png');
   squishImage = loadImage('Squish.png');
+
+  // Load sound effects
+  gunSound = loadSound('gun.mp3');
+  wrongSound = loadSound('wrong.mp3');
+  clockSound = loadSound('clock.mp3');
 }
 
 function setup() {
   createCanvas(800, 600);
   imageMode(CENTER);
-  
-  // Create initial bugs - reduced to a more manageable number
+
   for (let i = 0; i < 8; i++) {
     bugs.push(new Bug());
   }
-  
+
   lastTimeCheck = millis();
-  
-  // Create restart button (initially hidden)
+
   restartButton = createButton('Restart Game');
-  restartButton.position(width/2 - 50, height/2 + 80);
+  restartButton.position(width / 2 - 50, height / 2 + 80);
   restartButton.size(100, 40);
   restartButton.mousePressed(restartGame);
   restartButton.hide();
+
+  startMusic(); // Start background music when game starts
 }
 
 function draw() {
   background(220);
-  
-  // Game mechanics
+
   if (gameRunning) {
-    // Update timer
     if (millis() - lastTimeCheck >= 1000) {
       gameTime--;
       lastTimeCheck = millis();
+      musicSpeedFactor = map(gameTime, 30, 0, 1, 3); // Increase speed as time decreases
+
+      // Play clock sound at 10 seconds remaining
+      if (gameTime === 10 && !clockPlayed) {
+        clockSound.play();
+        clockPlayed = true; // Prevent multiple plays
+      }
     }
-    
-    // Check if game is over
+
     if (gameTime <= 0) {
       gameRunning = false;
       gameTime = 0;
-      restartButton.show(); // Show restart button when game ends
-      bugs = []; // Clear all bugs when game ends
+      restartButton.show();
+      bugs = [];
+      stopMusic(); // Stop music when the game ends
     }
-    
-    // Update and display all bugs
+
     for (let i = bugs.length - 1; i >= 0; i--) {
       let shouldRemove = bugs[i].update();
       if (shouldRemove) {
@@ -65,23 +88,18 @@ function draw() {
         bugs[i].display();
       }
     }
-    
-    // Add more bugs if needed - maintain fewer bugs on screen
+
     if (bugs.length < 6) {
       bugs.push(new Bug());
     }
   } else {
-    // Display game over
     fill(0);
     textSize(40);
     textAlign(CENTER);
-    text("GAME OVER", width/2, height/2);
-    text("Bugs Squished: " + squishCount, width/2, height/2 + 50);
-    
-    // No bugs are displayed after game over as the bugs array is cleared
+    text("GAME OVER", width / 2, height / 2);
+    text("Bugs Squished: " + squishCount, width / 2, height / 2 + 50);
   }
-  
-  // Display the score and timer
+
   fill(0);
   textSize(24);
   textAlign(LEFT);
@@ -89,108 +107,87 @@ function draw() {
   text("Time Left: " + gameTime, 20, 60);
 }
 
-// Restart game function
 function restartGame() {
-  // Reset game variables
   bugs = [];
   squishCount = 0;
   gameTime = 30;
   gameRunning = true;
   bugSpeed = 1;
   lastTimeCheck = millis();
-  
-  // Create new bugs - reduced number
+  clockPlayed = false; // Reset clock sound flag
+
   for (let i = 0; i < 8; i++) {
     bugs.push(new Bug());
   }
-  
-  // Hide restart button
+
   restartButton.hide();
+  startMusic(); // Restart music when game restarts
 }
 
-// Bug class
 class Bug {
   constructor() {
-    // Random starting position (not too close to edges)
     this.x = random(50, width - 50);
     this.y = random(50, height - 50);
-    
-    // Random direction
     this.angle = random(TWO_PI);
     this.speed = bugSpeed;
-    
-    // Animation related
     this.animationFrame = floor(random(2));
     this.animationSpeed = 10;
     this.frameCounter = 0;
-    
-    // Status
     this.squished = false;
     this.squishTime = 0;
-    this.size = 100; // **Increased bug size**
-    this.shouldRemove = false; // Flag to indicate if this bug should be removed
-
-    // New: Add a small delay before changing direction again
+    this.size = 100;
+    this.shouldRemove = false;
     this.directionChangeCooldown = millis();
   }
-  
+
   update() {
     if (this.squished) {
-      // Once squished, the bug stays in place and is removed after 1 second
       if (millis() - this.squishTime > 1000) {
-        return true; // Remove this bug
+        return true;
       }
-      return false; // Keep this squished bug
+      return false;
     } else {
-      // Move in current direction
       this.x += cos(this.angle) * this.speed;
       this.y += sin(this.angle) * this.speed;
 
-      // Change direction if near edge
       if (this.x < 40 || this.x > width - 40 || this.y < 40 || this.y > height - 40) {
         this.angle = random(TWO_PI);
       }
 
-      // **Fix: Prevent sporadic spinning by limiting direction changes**
-      if (millis() - this.directionChangeCooldown > 1000) { // Change direction every second at most
-        if (random(100) < 5) { // Lower chance of direction change
+      if (millis() - this.directionChangeCooldown > 1000) {
+        if (random(100) < 5) {
           this.angle = random(TWO_PI);
         }
         this.directionChangeCooldown = millis();
       }
-      
-      // Animation timing
+
       this.frameCounter++;
       if (this.frameCounter >= this.animationSpeed) {
         this.animationFrame = (this.animationFrame + 1) % 2;
         this.frameCounter = 0;
       }
     }
-    return false; // Keep this bug
+    return false;
   }
-  
+
   display() {
     push();
     translate(this.x, this.y);
-    
-    // Rotate based on the bug's angle
     rotate(this.angle + HALF_PI);
-    
+
     if (!this.squished) {
-      // Draw the appropriate animation frame for live bug
       if (this.animationFrame === 0) {
         image(bugImage1, 0, 0, this.size, this.size);
       } else {
         image(bugImage2, 0, 0, this.size, this.size);
       }
     } else {
-      // Draw squished bug in the same direction it was facing
       image(squishImage, 0, 0, this.size, this.size);
     }
-    
+
     pop();
   }
-  
+
   checkSquish(mouseX, mouseY) {
     if (!this.squished) {
       let d = dist(mouseX, mouseY, this.x, this.y);
@@ -206,26 +203,75 @@ class Bug {
 
 function mousePressed() {
   if (!gameRunning) return;
-  
+
   let squishHappened = false;
-  
-  // Check each bug for squishing
+
   for (let i = bugs.length - 1; i >= 0; i--) {
     if (bugs[i].checkSquish(mouseX, mouseY)) {
       squishCount++;
       squishHappened = true;
-      
-      // Increase bug speed more significantly after each squish
-      bugSpeed += 0.25; 
-      
-      // Add a new bug after a delay (but only one instead of two)
+      bugSpeed += 0.25;
+
+      // Play squish sound effect
+      gunSound.play();
+
       if (gameRunning) {
         setTimeout(() => {
-          if (gameRunning) { // Only add if game is still running
+          if (gameRunning) {
             bugs.push(new Bug());
           }
         }, 2000);
       }
     }
   }
+
+  // If no bug was squished, play the "wrong" sound effect
+  if (!squishHappened) {
+    wrongSound.play();
+  }
+}
+
+// ====== BACKGROUND MUSIC FUNCTIONS ======
+
+function startMusic() {
+  if (!isMusicPlaying) {
+    audioContext = new (window.AudioContext || window.webkitAudioContext)();
+    isMusicPlaying = true;
+    playLoopingMelody();
+  }
+}
+
+function stopMusic() {
+  isMusicPlaying = false;
+  activeOscillators.forEach(osc => {
+    osc.stop();
+    osc.disconnect();
+  });
+  activeOscillators = [];
+  if (musicTimeout) {
+    clearTimeout(musicTimeout);
+  }
+}
+
+function playLoopingMelody() {
+  if (!isMusicPlaying) return;
+
+  let time = audioContext.currentTime;
+  let interval = 0.3 / musicSpeedFactor;
+
+  for (let i = 0; i < 20; i++) {
+    let osc = audioContext.createOscillator();
+    let gainNode = audioContext.createGain();
+    let freq = melodyNotes[Math.floor(Math.random() * melodyNotes.length)];
+
+    osc.frequency.setValueAtTime(freq, time + i * interval);
+    osc.connect(gainNode);
+    gainNode.connect(audioContext.destination);
+    
+    osc.start(time + i * interval);
+    osc.stop(time + i * interval + 0.25);
+    activeOscillators.push(osc);
+  }
+
+  musicTimeout = setTimeout(playLoopingMelody, 6000 / musicSpeedFactor);
 }
